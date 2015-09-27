@@ -1,0 +1,98 @@
+<style>
+.reveal h1, .reveal h2, .reveal h3 {
+  word-wrap: normal;
+  -moz-hyphens: none;
+}
+.small-code pre code {
+  font-size: 1em;
+}
+.midcenter {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+}
+.footer {
+    color: black; background: #E8E8E8;
+    position: fixed; top: 90%;
+    text-align:center; width:100%;
+}
+.pinky .reveal .state-background {
+  background: #FF69B4;
+} 
+.pinky .reveal h1,
+.pinky .reveal h2,
+.pinky .reveal p {
+  color: black;
+}
+</style>
+
+
+Predicting Chronic Kidney Disease
+========================================================
+author: Zee Cods
+date: `r Sys.Date()`
+font-family: 'Arial'
+
+Introduction
+========================================================
+
+Chronic kidney disease (CKD) is a condition characterized by a gradual loss of kidney function over time. CKD is also known as chronic renal disease. Below are some facts about CKD
+
+- 26 million American adults have CKD
+- Early detection can help prevent progression
+- Hypertension causes CKD and CKD causes hypertension
+
+Predicting CKD
+========================================================
+
+Using the [UCI Chronic_Kidney_Disease Data Set](archive.ics.uci.edu/ml/datasets/Chronic_Kidney_Disease) we get the training data that we use to build a Random Forest algorithm prediction model
+```{r echo = FALSE}
+library(caret)
+if (!file.exists('./chronic_kidney_disease_full.csv')) {
+  download.file(url = 'https://raw.githubusercontent.com/zcds/developing-data-products/master/Chronic_Kidney_Disease/chronic_kidney_disease_full.csv', destfile = './chronic_kidney_disease_full.csv', method = 'curl')
+}
+
+ckd <- read.csv(file = './chronic_kidney_disease_full.csv', , na.strings = c("?"))
+
+# Prepare Data
+## Tranform the variables to factors
+ckd$sg <- as.factor(ckd$sg)
+ckd$al <- as.factor(ckd$al)
+ckd$su <- as.factor(ckd$su)
+ckd$class <- as.factor(ckd$class)
+
+
+## Replace missing numeric values with column mean
+for (i in which(sapply(ckd, is.numeric))) {
+  ckd[is.na(ckd[, i]), i] <- mean(ckd[, i],  na.rm = TRUE)
+}
+
+## Replace missing factors with column samples
+for (i in which(!sapply(ckd, is.numeric))) {
+  ckd[is.na(ckd[, i]), i] <- sample(x = levels(ckd[,i]), size = sum(is.na(ckd[,i])), replace = TRUE)
+}
+
+trainingSplit <- createDataPartition(y = ckd$class, p=0.60, list=FALSE)
+trainingData <- ckd[trainingSplit,]
+testingData <- ckd[-trainingSplit,]
+```
+```{r}
+rfModel <- train(class ~ ., data = trainingData, method = 'rf', trControl = trainControl(method = 'cv',number = 5,repeats = 2,returnResamp = 'none'))
+rfModel$modelInfo$tags
+```
+
+Accuracy of the Random Forest Model
+========================================================
+Using the 60:40, training:testing data split strategy we validated the model. 
+```{r, echo=FALSE}
+testingResult <- predict(rfModel, testingData)
+rfConfusionMatrix <- confusionMatrix(testingResult, testingData$class)
+rfConfusionMatrix$overall[1]
+```
+The higher the accuracy of the model, the more credible is it to predict CKD.
+
+
+See it in Action
+========================================================
+- This model to predict CKD is deployed as a [`shiny`](http://www.shinyapps.io) app. 
+- You can play with it here: https://zcds.shinyapps.io/ckdpredictor
